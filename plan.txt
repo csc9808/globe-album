@@ -1,0 +1,17 @@
+Here is the comprehensive plan to address the issue with the markers not being positioned correctly on the globe:
+
+### Plan:
+1. **Review Positioning Calculations**:
+   - Analyze the calculations in the `updateMarkerPosition` function to ensure that the latitude and longitude are being converted correctly to 3D coordinates.
+
+2. **Adjust Radius**:
+   - Verify the radius used in the `updateMarkerPosition` function. Ensure that it matches the size of the globe (currently set to 5 in the `SphereGeometry`).
+
+3. **Testing**:
+   - After making adjustments, test the positioning of the markers to confirm they are displayed correctly on the globe.
+
+4. **Logging**:
+   - Utilize console logs to track the positions of the markers before and after adjustments to ensure the changes are effective.
+
+5. **Final Review**:
+   - Review the overall functionality to ensure that the markers are interactive and respond correctly to user clicks.

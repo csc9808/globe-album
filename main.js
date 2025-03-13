@@ -47,60 +47,81 @@ function onMouseMove(event) {
 window.addEventListener('mousemove', onMouseMove, false);
 // Function to create city markers
 function createCityMarker(cityName, lat, lon, radius = 5, color = 0xFFa500) {
+    // Create the marker geometry (sphere)
     const markerGeometry = new THREE.SphereGeometry(0.05, 10, 10); // Marker size
     const markerMaterial = new THREE.MeshBasicMaterial({ color });
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
 
-    // Store lat, lon, radius, and city name in userData
+    // Store city info in the marker's userData
     marker.userData = { cityName, lat, lon, radius };
 
     // Position marker relative to the globe's center
     updateMarkerPosition(marker);
 
-    // Add marker to the globe (as its child)
+    // Add marker to the globe (as a child)
     globe.add(marker);
-    // Create an HTML label
-    const label = document.createElement('div');
-    label.className = 'city-label';
-    label.textContent = cityName;
-    document.body.appendChild(label);
 
-    // Store the label reference
-    marker.userData.label = label;
+    // Create a canvas for the label texture
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = '30px Arial';
+    context.fillStyle = 'white';
+    context.fillText(cityName, 10, 30);
 
-    // Apply hover effect
-    applyHoverEffect(marker);
+    // Create a texture from the canvas
+    const labelTexture = new THREE.CanvasTexture(canvas);
+    
+    // Create the sprite material and sprite for the label
+    const labelMaterial = new THREE.SpriteMaterial({ map: labelTexture });
+    const labelSprite = new THREE.Sprite(labelMaterial);
+    labelSprite.scale.set(1, 0.5, 1); // Scale the sprite (adjust size here)
+    
+    // Position the label sprite just above the marker
+    labelSprite.position.set(0, 0.1, 0);
+
+    // Add the sprite to the marker as a child
+    marker.add(labelSprite);
 
     return marker;
 }
-
-// Update marker position and apply label rotation
 function updateMarkerPosition(marker) {
-    const { cityName, lat, lon, radius } = marker.userData;
+    const { lat, lon, radius } = marker.userData;
 
-    // Ensure lat is between -90 and 90, and lon is between -180 and 180
     var latRad = lat * (Math.PI / 180);
     var lonRad = -lon * (Math.PI / 180);
 
-    // Set position of marker in 3D space using spherical coordinates
+    // Update marker position based on lat, lon
     marker.position.set(
         Math.cos(latRad) * Math.cos(lonRad) * radius,
         Math.sin(latRad) * radius,
         Math.cos(latRad) * Math.sin(lonRad) * radius
     );
-    marker.rotation.set(0.0, -lonRad, latRad - Math.PI * 0.5);
 
-    // Adjust label's position to be at the bottom of the marker
+    // Update label position in screen space
     if (marker.userData.label) {
-        // Adjust label position with a small offset along the y-axis (or z-axis if needed)
-        const labelOffset = 15;  // Adjust this value for more or less space
-        marker.userData.label.style.transform = `translate(-50%, -50%) translateY(${labelOffset}px)`;
+        const vector = marker.position.clone();
+        vector.applyMatrix4(globe.matrixWorld); // Apply globe rotation
+        vector.project(camera); // Convert 3D to 2D screen space
 
-        // Apply rotation to the label to make it rotate with the marker
-        const labelRotation = new THREE.Euler(0, marker.rotation.y, 0);
-        marker.userData.label.style.transform += ` rotate(${THREE.MathUtils.radToDeg(labelRotation.y)}deg)`;
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (1 - (vector.y * 0.5 + 0.5)) * window.innerHeight;
+
+        const distance = camera.position.distanceTo(marker.position);
+        const labelOffset = 5 * (distance / camera.position.z);
+
+        // Update label position
+        marker.userData.label.style.display = 'block';
+        marker.userData.label.style.left = `${x}px`;
+        marker.userData.label.style.top = (y + labelOffset) + 'px';
+
+        // Apply rotation to follow the globe
+        const labelRotation = THREE.MathUtils.radToDeg(globe.rotation.y);
+marker.userData.label.style.transform = `translate(-50%, -50%) rotate(${labelRotation}deg)`;
+
     }
 }
+
+
 
 // Create markers for cities with city names included in the data
 const cities = {
@@ -143,7 +164,6 @@ window.addEventListener('click', (event) => {
     }
 });
 
-// Modify your popup logic to stop/resume the globe rotation
 function showPopup(city) {
     const existingPopup = document.querySelector('.popup');
     if (existingPopup) {
@@ -159,12 +179,15 @@ function showPopup(city) {
     title.textContent = city;
     popup.appendChild(title);
 
+    // Create the container for the images
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'image-container';
+
     // Images for the city
     const images = {
-        'New York': ['assets/city_images/ny1.jpg', 'assets/city_images/ny2.jpg'],
         'Los Angeles': ['assets/city_images/la1.jpg', 'assets/city_images/la2.jpg'],
         'San Diego': ['assets/city_images/sd1.jpg', 'assets/city_images/sd2.jpg'],
-        'Miami': ['assets/city_images/miami1.jpg', 'assets/city_images/miami2.jpg'],
+        'Miami': ['assets/city_images/miami1.jpg','assets/city_images/miami1.jpg','assets/city_images/miami1.jpg','assets/city_images/miami1.jpg','assets/city_images/miami1.jpg', 'assets/city_images/miami2.jpg'],
         'Washington DC': ['assets/city_images/dc1.jpg', 'assets/city_images/dc2.jpg'],
         'Toronto': ['assets/city_images/toronto1.jpg', 'assets/city_images/toronto2.jpg'],
         'Nashville': ['assets/city_images/nash1.jpg', 'assets/city_images/nash2.jpg'],
@@ -178,8 +201,10 @@ function showPopup(city) {
     images[city].forEach(imgSrc => {
         const img = document.createElement('img');
         img.src = imgSrc;
-        popup.appendChild(img);
+        imageContainer.appendChild(img);
     });
+
+    popup.appendChild(imageContainer);
 
     // Close Button
     const closeButton = document.createElement('button');
@@ -243,32 +268,63 @@ function showPopup(city) {
     });
 
     stopGlobeRotation(); // Stop globe rotation when popup opens
+
+    // Automatically scroll the images slowly
+    let scrollInterval = setInterval(() => {
+        imageContainer.scrollTop += 1; // Scroll the images slowly
+        if (imageContainer.scrollTop + imageContainer.clientHeight >= imageContainer.scrollHeight) {
+            imageContainer.scrollTop = 0; // Reset when the end is reached
+        }
+    }, 50); // Change the interval for faster/slower scrolling
+
+    // Allow the user to manually drag images as well
+    imageContainer.addEventListener('mousedown', (e) => {
+        let startY = e.clientY;
+        let startScrollTop = imageContainer.scrollTop;
+
+        const onMouseMove = (moveEvent) => {
+            const deltaY = moveEvent.clientY - startY;
+            imageContainer.scrollTop = startScrollTop - deltaY;
+        };
+
+        const onMouseUp = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    });
 }
 
 function applyHoverEffect(marker) {
-    // Store the original scale and color in userData to revert back when mouse leaves
-    const originalScale = marker.scale.clone();
-    const originalColor = marker.material.color.clone();  // Store the original color in userData
+    const originalScale = marker.scale.clone();  // Save the marker's scale
+    const hoverScale = 1.2; // Scaling for hover effect
+    const hoverColor = new THREE.Color(0xFF8C00); // Hover color for the marker
 
     marker.userData.originalScale = originalScale;
-    marker.userData.originalColor = originalColor;
-
-    const hoverScale = 1.2; // 20% larger
-    const hoverColor = new THREE.Color(0xFF8C00); // Darker orange color
+    marker.userData.originalColor = marker.material.color.clone();
 
     marker.onmouseover = () => {
-        marker.scale.set(hoverScale, hoverScale, hoverScale); // Change size
-        marker.material.color.set(hoverColor); // Change color
-        marker.userData.label.style.fontWeight = 'bold'; // Bold the label text
+        marker.scale.set(hoverScale, hoverScale, hoverScale); // Enlarge the marker
+        marker.material.color.set(hoverColor); // Change the marker's color
+
+        // Optionally apply scale effect to the sprite (label) as well
+        if (marker.children[0]) {  // If the label sprite exists
+            marker.children[0].scale.set(1.2, 0.6, 1); // Enlarge the sprite label
+        }
     };
 
     marker.onmouseout = () => {
-        marker.scale.copy(marker.userData.originalScale); // Reset size from userData
-        marker.material.color.set(marker.userData.originalColor); // Reset color from userData
-        marker.userData.label.style.fontWeight = 'normal'; // Revert label text to normal
+        marker.scale.copy(marker.userData.originalScale); // Reset scale
+        marker.material.color.set(marker.userData.originalColor); // Reset color
+
+        // Reset sprite label scale
+        if (marker.children[0]) {
+            marker.children[0].scale.set(1, 0.5, 1); // Reset sprite scale
+        }
     };
 }
-
 
 function checkForHoverEffect() {
     raycasterHover.setFromCamera(mouseHover, camera);
@@ -282,10 +338,21 @@ function checkForHoverEffect() {
                 resetHoverEffect(lastHoveredMarker); // Reset previous marker hover effect
             }
 
+            // Save the original color and scale if they are not already saved
+            if (!hoveredMarker.userData.originalScale) {
+                hoveredMarker.userData.originalScale = hoveredMarker.scale.clone(); // Save original scale
+                hoveredMarker.userData.originalColor = hoveredMarker.material.color.clone(); // Save original color
+            }
+
             // Apply hover effect directly instead of relying on events
             hoveredMarker.scale.set(1.2, 1.2, 1.2); // Increase size
             hoveredMarker.material.color.set(0xFF8C00); // Change color to orange
-            hoveredMarker.userData.label.style.fontWeight = 'bold'; // Bold the label
+
+            // If there's a label (THREE.Sprite), modify its properties
+            if (hoveredMarker.children[0]) {  // If the label sprite exists
+                const labelSprite = hoveredMarker.children[0];
+                labelSprite.scale.set(1.2, 0.6, 1); // Enlarge the sprite label
+            }
 
             lastHoveredMarker = hoveredMarker;
         }
@@ -298,11 +365,19 @@ function checkForHoverEffect() {
 }
 
 
+
+
 function resetHoverEffect(marker) {
+    // Check if originalScale and originalColor are defined in userData
     if (marker.userData.originalScale && marker.userData.originalColor) {
-        marker.scale.copy(marker.userData.originalScale); // Reset size
-        marker.material.color.set(marker.userData.originalColor); // Reset color
-        marker.userData.label.style.fontWeight = 'normal'; // Revert label text to normal
+        // Reset scale and color to original
+        marker.scale.copy(marker.userData.originalScale);
+        marker.material.color.copy(marker.userData.originalColor); // Reset color
+
+        // If there's a label (THREE.Sprite), reset its scaling
+        if (marker.children[0]) {  // If the label sprite exists
+            marker.children[0].scale.set(1, 0.5, 1); // Reset label sprite scale
+        }
     }
 }
 
@@ -320,7 +395,7 @@ function resumeGlobeRotation() {
     isPopupOpen = false; // Popup closed, restart rotation
 }
 
-// Modify the animate function to check if the popup is open
+// Animate function
 function animate() {
     requestAnimationFrame(animate);
     TWEEN.update(); // This is crucial for the animations to run
@@ -335,7 +410,8 @@ function animate() {
     // Update the marker's positions and check for hover effects
     globe.children.forEach(marker => {
         if (marker instanceof THREE.Mesh && marker.userData.label) {
-            updateMarkerPosition(marker);  // Update marker position based on lat, lon
+            // Update marker position based on lat, lon
+            updateMarkerPosition(marker);
 
             // Check visibility of marker and apply hover effects
             const markerDirection = marker.position.clone().sub(camera.position).normalize();
@@ -346,6 +422,7 @@ function animate() {
             const isBlocked = intersects.length > 0 && intersects[0].distance < camera.position.distanceTo(marker.position);
 
             if (isFacingCamera && !isBlocked) {
+                // Project marker's 3D position to 2D screen space
                 const vector = marker.position.clone();
                 vector.project(camera);
 
@@ -355,13 +432,18 @@ function animate() {
                 const distance = camera.position.distanceTo(marker.position);
                 const labelOffset = 5 * (distance / camera.position.z);
 
+                // Show the label and position it
                 marker.userData.label.style.display = 'block';
                 marker.userData.label.style.left = `${x}px`;
                 marker.userData.label.style.top = `${y + labelOffset}px`;
 
+                // Apply only Y-axis rotation to the label to prevent vertical tilting
+                const labelRotation = new THREE.Euler(0, marker.rotation.y, 0);
                 marker.userData.label.style.transform = `translate(-50%, -50%) translateY(${labelOffset + 20}px)`;
 
-                checkForHoverEffect(); // Perform hover detection and apply the effect
+
+                // Perform hover detection and apply effects
+                checkForHoverEffect();
             } else {
                 marker.userData.label.style.display = 'none'; // Hide label if behind camera
             }
@@ -371,6 +453,7 @@ function animate() {
     controls.update();
     renderer.render(scene, camera);
 }
+
 
 // Start the animation loop
 animate();

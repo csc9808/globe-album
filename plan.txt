@@ -1,17 +1,15 @@
-Here is the comprehensive plan to address the issue with the markers not being positioned correctly on the globe:
+Here is the comprehensive plan for executing the task of changing the 2D divs city levels to sprite-based 3D elements:
 
 ### Plan:
-1. **Review Positioning Calculations**:
-   - Analyze the calculations in the `updateMarkerPosition` function to ensure that the latitude and longitude are being converted correctly to 3D coordinates.
+1. **Create Textures for City Markers**:
+   - Use the existing city images located in the `assets/city_images/` directory to create textures for each city marker.
 
-2. **Adjust Radius**:
-   - Verify the radius used in the `updateMarkerPosition` function. Ensure that it matches the size of the globe (currently set to 5 in the `SphereGeometry`).
+2. **Update Marker Creation Logic**:
+   - Modify the `createCityMarker` function to create `THREE.Sprite` objects instead of `THREE.Mesh` for the city markers. This will allow the markers to be rendered as 3D sprites.
 
-3. **Testing**:
-   - After making adjustments, test the positioning of the markers to confirm they are displayed correctly on the globe.
+3. **Positioning and Labeling**:
+   - Update the logic for positioning the sprites to ensure they are correctly placed on the globe.
+   - Adjust the label positioning logic to work with the new sprite-based markers, ensuring that labels are displayed correctly in relation to the sprites.
 
-4. **Logging**:
-   - Utilize console logs to track the positions of the markers before and after adjustments to ensure the changes are effective.
-
-5. **Final Review**:
-   - Review the overall functionality to ensure that the markers are interactive and respond correctly to user clicks.
+4. **Testing**:
+   - After implementing the changes, test the application to ensure that the city markers are displayed as 3D sprites and that the labels function correctly.

@@ -2,6 +2,11 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: Arial, sans-serif;
+    background-image: url('assets/Galaxy-stars.gif');
+    background-size: cover;  /* Ensures the gif covers the full viewport */
+    background-position: center center;  /* Centers the gif */
+    background-attachment: fixed;  /* Keeps the gif fixed while scrolling */
+    height: 100vh;  /* Ensure the body takes the full height of the viewport */
 }
 
 canvas {
@@ -60,14 +65,76 @@ canvas {
     transition: transform 0.3s;
 }
 
-.city-label {
+
+    .city-label {
+        position: absolute;
+        font-size: 12px;
+        color: white;
+        font-family: Arial, sans-serif;
+        pointer-events: none; /* Ensure labels don't interfere with mouse events */
+    }
+/* Pop-up Styling */
+.popup {
     position: absolute;
-    color: rgb(246, 159, 10);
-    font-size: 12px;
-    padding-top: 3px;
-    padding: 3px 6px;
-    border-radius: 3px;
-    white-space: nowrap;
-    transform: translate(-50%, -50%);
-    pointer-events: none; /* Prevent interference with clicks */
+    top: 50px;
+    left: 50px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    max-width: 300px;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    cursor: grab;
+    overflow: hidden;
+}
+
+/* Title and close button */
+.popup h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+    text-align: center;
+}
+
+.image-container {
+    display: flex;
+    flex-direction: column;
+    overflow-y: scroll;
+    max-height: 600px;
+    margin-top: 10px;
+    gap: 10px;
+    cursor: grab;
+    scrollbar-width: none;  /* For Firefox */
+}
+
+.image-container::-webkit-scrollbar {
+    display: none;  /* For Chrome, Safari, and Edge */
+}
+
+/* Individual Image styling */
+.popup img {
+    width: 100%;
+    border-radius: 5px;
+    object-fit: cover;
+    cursor: pointer;
+}
+
+/* Close Button Styling */
+.close-btn {
+    background: rgb(186, 54, 238);
+    color: rgb(241, 241, 189);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.close-btn:hover {
+    background: rgb(69, 2, 96);
 }

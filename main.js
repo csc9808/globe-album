@@ -1,10 +1,10 @@
 // Setup scene, camera, and renderer
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+camera.position.z = 10;
 
 // Load the world texture
 const textureLoader = new THREE.TextureLoader();
@@ -21,15 +21,24 @@ scene.add(globe);
 // Lighting
 const light = new THREE.AmbientLight(0xbbbbbb, 2);
 scene.add(light);
-scene.background = new THREE.Color(0x000d21);
+scene.background = new THREE.Color(0x231d2b);
 scene.fog = new THREE.Fog(0x535ef3, 400, 2000);
 
-// Camera position
-camera.position.z = 10;
 
 // OrbitControls
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+
+const cameraDirection = new THREE.Vector3();
+// Animate function updated to include hover checking logic
+let isPopupOpen = false; // Flag to control popup state
+// Function to stop and resume the globe rotation
+function stopGlobeRotation() {
+    isPopupOpen = true;  // Popup is open, stop rotation
+}
+function resumeGlobeRotation() {
+    isPopupOpen = false; // Popup closed, restart rotation
+}
 
 // Resize handling
 window.addEventListener('resize', () => {
@@ -37,6 +46,8 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 });
+
+// Even handling for Mouse movement, check if mouse is hovering.
 function onMouseMove(event) {
     // Update mouse position based on the client position
     mouseHover.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -45,7 +56,66 @@ function onMouseMove(event) {
 }
 // Add the event listener to track mouse movement
 window.addEventListener('mousemove', onMouseMove, false);
-// Function to create city markers
+
+// Ranoming the color of the stars
+function getRandomHexColor() {
+    // Generate a random number between 0 and 255 for each RGB component
+    let r = Math.floor(Math.random() * 256); // Red
+    let g = Math.floor(Math.random() * 256); // Green
+    let b = Math.floor(Math.random() * 256); // Blue
+  
+    // Convert each component to a 2-digit hexadecimal string and combine them
+    let hexColor = "#" + 
+                   r.toString(16).padStart(2, '0') +
+                   g.toString(16).padStart(2, '0') +
+                   b.toString(16).padStart(2, '0');
+  
+    return hexColor;
+}
+
+// Create a starry background
+function createStars() {
+    const starCount = 10000; // Number of stars
+    const starsGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(starCount * 3); // x, y, z positions for each star
+    const colors = new Float32Array(starCount * 3); // r, g, b colors for each star
+
+    for (let i = 0; i < starCount; i++) {
+        // Randomly position the stars in a large volume around the camera
+        positions[i * 3] = Math.random() * 2000 - 1000;  // x position
+        positions[i * 3 + 1] = Math.random() * 2000 - 1000;  // y position
+        positions[i * 3 + 2] = Math.random() * 2000 - 1000;  // z position
+
+        // Randomize the color for each star (convert hex to RGB)
+        const color = getRandomHexColor();
+        const r = parseInt(color.slice(1, 3), 16) / 255; // Red
+        const g = parseInt(color.slice(3, 5), 16) / 255; // Green
+        const b = parseInt(color.slice(5, 7), 16) / 255; // Blue
+
+        // Set the color values in the colors array
+        colors[i * 3] = r;  // Red
+        colors[i * 3 + 1] = g;  // Green
+        colors[i * 3 + 2] = b;  // Blue
+    }
+
+    starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    // Create a points material (stars) with transparency
+    const starsMaterial = new THREE.PointsMaterial({
+        size: Math.random(),         // Size of each star
+        vertexColors: true,          // Enable vertex colors
+        transparent: true,           // To handle the opacity
+        opacity: 3                   // Star opacity
+    });
+
+    // Create a points object (stars) and add it to the scene
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+}
+createStars();
+
+// function to create city markers on the globe.
 function createCityMarker(cityName, lat, lon, radius = 5, color = 0xFFa500) {
     // Create the marker geometry (sphere)
     const markerGeometry = new THREE.SphereGeometry(0.05, 10, 10); // Marker size
@@ -84,6 +154,8 @@ function createCityMarker(cityName, lat, lon, radius = 5, color = 0xFFa500) {
 
     return marker;
 }
+
+// function to update the marker position based on lat, lon
 function updateMarkerPosition(marker) {
     const { lat, lon, radius } = marker.userData;
 
@@ -117,12 +189,8 @@ function updateMarkerPosition(marker) {
         // Apply rotation to follow the globe
         const labelRotation = THREE.MathUtils.radToDeg(globe.rotation.y);
 marker.userData.label.style.transform = `translate(-50%, -50%) rotate(${labelRotation}deg)`;
-
     }
 }
-
-
-
 // Create markers for cities with city names included in the data
 const cities = {
     'New York': createCityMarker('New York', 40.7128, -74.0060),
@@ -143,16 +211,12 @@ let lastHoveredMarker = null;
 // Raycasting for detecting clicks
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-
 window.addEventListener('click', (event) => {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
-
     // Collect all objects in the scene (including globe and markers)
     const intersects = raycaster.intersectObjects([globe, ...globe.children]);
-
     if (intersects.length > 0) {
         const clickedObject = intersects[0].object;
         for (let city in cities) {
@@ -164,25 +228,22 @@ window.addEventListener('click', (event) => {
     }
 });
 
+// function to show pop-up when marker is clicked for album
 function showPopup(city) {
     const existingPopup = document.querySelector('.popup');
     if (existingPopup) {
         document.body.removeChild(existingPopup);
     }
-
     const popup = document.createElement('div');
     popup.className = 'popup';
     popup.style.opacity = '0'; // Start hidden for fade-in effect
-
     // Title
     const title = document.createElement('h2');
     title.textContent = city;
     popup.appendChild(title);
-
     // Create the container for the images
     const imageContainer = document.createElement('div');
     imageContainer.className = 'image-container';
-
     // Images for the city
     const images = {
         'Los Angeles': ['assets/city_images/la1.jpg', 'assets/city_images/la2.jpg'],
@@ -197,78 +258,62 @@ function showPopup(city) {
         'Semarang': ['assets/city_images/semarang1.jpg', 'assets/city_images/semarang2.jpg'],
         'Bali': ['assets/city_images/bali1.jpg', 'assets/city_images/bali2.jpg'],
     };
-
     images[city].forEach(imgSrc => {
         const img = document.createElement('img');
         img.src = imgSrc;
         imageContainer.appendChild(img);
     });
-
     popup.appendChild(imageContainer);
-
     // Close Button
     const closeButton = document.createElement('button');
     closeButton.className = 'close-btn';
     closeButton.textContent = 'Close';
     closeButton.onclick = () => {
         popup.style.opacity = '0';
-
         // Smoothly return camera to default position
         new TWEEN.Tween(camera.position)
             .to({ x: 0, y: 0, z: 10 }, 1000)
             .easing(TWEEN.Easing.Quadratic.Out)
             .start();
-
         setTimeout(() => {
             document.body.removeChild(popup);
             resumeGlobeRotation(); // Resume globe rotation when popup is closed
         }, 300);
-
         isPopupOpen = false; // Popup closed, restart rotation
     };
     popup.appendChild(closeButton);
-
     document.body.appendChild(popup);
-
     // Fade-in Effect
     setTimeout(() => popup.style.opacity = '1', 10);
-
     // Smoothly move camera closer to the city
     const targetPosition = new THREE.Vector3(
         cities[city].position.x * 1.5,
         cities[city].position.y * 1.5,
         cities[city].position.z * 1.5
     );
-
     new TWEEN.Tween(camera.position)
         .to(targetPosition, 1000) // 1 second animation
         .easing(TWEEN.Easing.Quadratic.Out)
         .start();
-
     // Make Popup Draggable
     let isDragging = false, offsetX, offsetY;
-
     popup.addEventListener('mousedown', (event) => {
         isDragging = true;
         offsetX = event.clientX - popup.offsetLeft;
         offsetY = event.clientY - popup.offsetTop;
         popup.style.cursor = 'grabbing';
     });
-
     window.addEventListener('mousemove', (event) => {
         if (isDragging) {
             popup.style.left = `${event.clientX - offsetX}px`;
             popup.style.top = `${event.clientY - offsetY}px`;
         }
     });
-
     window.addEventListener('mouseup', () => {
         isDragging = false;
         popup.style.cursor = 'grab';
     });
-
     stopGlobeRotation(); // Stop globe rotation when popup opens
-
     // Automatically scroll the images slowly
     let scrollInterval = setInterval(() => {
         imageContainer.scrollTop += 1; // Scroll the images slowly
@@ -276,49 +321,41 @@ function showPopup(city) {
             imageContainer.scrollTop = 0; // Reset when the end is reached
         }
     }, 50); // Change the interval for faster/slower scrolling
-
     // Allow the user to manually drag images as well
     imageContainer.addEventListener('mousedown', (e) => {
         let startY = e.clientY;
         let startScrollTop = imageContainer.scrollTop;
-
         const onMouseMove = (moveEvent) => {
             const deltaY = moveEvent.clientY - startY;
             imageContainer.scrollTop = startScrollTop - deltaY;
         };
-
         const onMouseUp = () => {
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
         };
-
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
     });
 }
 
+// specific hover effect on marker
 function applyHoverEffect(marker) {
     const originalScale = marker.scale.clone();  // Save the marker's scale
     const hoverScale = 1.2; // Scaling for hover effect
     const hoverColor = new THREE.Color(0xFF8C00); // Hover color for the marker
-
     marker.userData.originalScale = originalScale;
     marker.userData.originalColor = marker.material.color.clone();
-
     marker.onmouseover = () => {
         marker.scale.set(hoverScale, hoverScale, hoverScale); // Enlarge the marker
         marker.material.color.set(hoverColor); // Change the marker's color
-
         // Optionally apply scale effect to the sprite (label) as well
         if (marker.children[0]) {  // If the label sprite exists
             marker.children[0].scale.set(1.2, 0.6, 1); // Enlarge the sprite label
         }
     };
-
     marker.onmouseout = () => {
         marker.scale.copy(marker.userData.originalScale); // Reset scale
         marker.material.color.set(marker.userData.originalColor); // Reset color
-
         // Reset sprite label scale
         if (marker.children[0]) {
             marker.children[0].scale.set(1, 0.5, 1); // Reset sprite scale
@@ -337,7 +374,6 @@ function checkForHoverEffect() {
             if (lastHoveredMarker) {
                 resetHoverEffect(lastHoveredMarker); // Reset previous marker hover effect
             }
-
             // Save the original color and scale if they are not already saved
             if (!hoveredMarker.userData.originalScale) {
                 hoveredMarker.userData.originalScale = hoveredMarker.scale.clone(); // Save original scale
@@ -364,9 +400,7 @@ function checkForHoverEffect() {
     }
 }
 
-
-
-
+// function to reset hover effect
 function resetHoverEffect(marker) {
     // Check if originalScale and originalColor are defined in userData
     if (marker.userData.originalScale && marker.userData.originalColor) {
@@ -380,21 +414,6 @@ function resetHoverEffect(marker) {
         }
     }
 }
-
-
-const cameraDirection = new THREE.Vector3();
-// Animate function updated to include hover checking logic
-let isPopupOpen = false; // Flag to control popup state
-
-// Function to stop and resume the globe rotation
-function stopGlobeRotation() {
-    isPopupOpen = true;  // Popup is open, stop rotation
-}
-
-function resumeGlobeRotation() {
-    isPopupOpen = false; // Popup closed, restart rotation
-}
-
 // Animate function
 function animate() {
     requestAnimationFrame(animate);
@@ -453,7 +472,6 @@ function animate() {
     controls.update();
     renderer.render(scene, camera);
 }
-
 
 // Start the animation loop
 animate();
